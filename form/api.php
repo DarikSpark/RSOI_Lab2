@@ -34,7 +34,105 @@ if ($Module == 'me') {
     }
 }
 
+
+
 if ($Module == 'bargain') {
+    header('Content-type: application/json');
+    $token = getallheaders();
+    $token = $token['Authorization'];
+    $token = substr($token, 7);
+
+    $arr = mysqli_fetch_assoc(mysqli_query($CONNECT, "SELECT `user_id`, `expired` FROM `oauth_apps_codes`
+    WHERE `token`='$token'"));
+    $user_id = $arr['user_id'];
+    if (floatval($arr['expired']) >= floatval(strtotime('now'))) {
+        $per_page = 5;
+        $page = 1;
+        if ($_GET['per_page']) {$per_page = $_GET['per_page'];}
+        if ($_GET['page']){
+            $page = $_GET['page'];
+        }
+        $cur_entry = ($page-1)*$per_page;
+
+        $Row = mysqli_query($CONNECT, "SELECT * FROM bargain WHERE managerID='$user_id' LIMIT $cur_entry, $per_page");
+
+//        $total = mysqli_num_rows($Row);
+        $sql="select count(*) as count_bargs from `bargain` WHERE managerID='$user_id'";
+        $res=mysqli_query($CONNECT, $sql);
+        $counts=mysqli_fetch_array($res);
+        $total=$counts['count_bargs'];
+//        echo $total;
+
+        $page_count = round($total/$per_page, 0, PHP_ROUND_HALF_UP);
+        if ($total%$per_page <= $per_page/2) {$page_count++;}
+
+//        echo 'page count: '.$page_count;
+
+//        echo  intval($_GET['page']);
+        if ($_GET['page'] > $page_count or intval($_GET['page']) == 0 or intval($_GET['per_page']) == 0 or $_GET['per_page'] > $total) {
+            $response['Текущая страница']=0;
+            $response['Всего записей']=$total;
+            $response['Записей на страницу']=floatval($per_page);
+            $response['Всего страниц']= $page_count;
+
+            $jsonString = json_encode($response);
+            echo $jsonString;
+        header("HTTP/1.0 400 Bad request");
+        exit();
+    }
+
+//        if(!is_int(floatval($_GET['page'])))
+
+
+        $response = array(
+            "Текущая страница"=>$page,
+            "Всего записей"=>0,
+            "Записей на страницу"=>5,
+            "Всего страниц" => 0
+
+        );
+        $i = 1;
+
+        while ($myrowbargain = mysqli_fetch_array($Row))
+        {
+            $selclient = mysqli_query($CONNECT, "SELECT * FROM clients WHERE clientID='$myrowbargain[clientID]'");
+            $myrowclient = mysqli_fetch_array($selclient);
+
+
+            $response[$i] = array(
+                "Название компании"=>$myrowclient['company'],
+                "ФИО"=>$myrowclient['lastName'].' '.$myrowclient['firstName'].' '.$myrowclient['secondName'],
+                "Телефон"=>$myrowclient['telephone'],
+                "Статус сделки"=>$myrowbargain['statusBargain'],
+                "Бюджет"=>$myrowbargain['budget']
+            );
+            $i++;
+        }
+
+
+        $response['Текущая страница']=$_GET['page'];
+        $response['Всего записей']=$total;
+        $response['Записей на страницу']=floatval($per_page);
+        $response['Всего страниц']= $page_count;
+
+        $jsonString = json_encode($response);
+        echo $jsonString;
+    }
+    else {
+        $response = array(
+            "Error"=>"Истекло время действия сессии"
+        );
+        $jsonString = json_encode($response);
+        echo $jsonString;
+        header("HTTP/1.0 401 Unauthorized");
+//        echo 'Expired: '.floatval($arr['expired']).'     Текущее время: '.floatval(strtotime('now'));
+    }
+}
+
+
+
+
+if ($Module == 'bargain2') {
     header('Content-type: application/json');
     $token = getallheaders();
     $token = $token['Authorization'];
@@ -110,6 +208,8 @@ else {
 //        echo 'Expired: '.floatval($arr['expired']).'     Текущее время: '.floatval(strtotime('now'));
     }
 }
+
+
 
 if ($Module == 'managers') {
     header('Content-type: application/json');
